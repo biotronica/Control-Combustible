@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Combustible">
+<title>Control de Combustible</title>
+<style>
+:root{
+  --bg:#0f172a;--card:#1e293b;--card2:#273449;--line:#334155;
+  --tx:#e2e8f0;--mut:#94a3b8;--acc:#f59e0b;--ok:#22c55e;--bad:#ef4444;--blue:#38bdf8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(80px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+  -webkit-tap-highlight-color:transparent}
+header{padding:16px 16px 8px;display:flex;justify-content:space-between;align-items:baseline}
+header h1{font-size:1.25rem}
+header h1 span{color:var(--acc)}
+.ver{font-size:.75rem;color:var(--mut);text-align:right}
+.sync{font-size:.72rem;color:var(--mut);cursor:pointer;margin-top:2px}
+.sync.err{color:var(--acc)}.sync.ok{color:var(--ok)}
+main{padding:0 12px;max-width:640px;margin:0 auto}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h2{font-size:.95rem;color:var(--mut);font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;font-size:.8rem;color:var(--mut);margin-bottom:4px}
+input[type=text],input[type=number],input[type=date]{width:100%;padding:11px 10px;border-radius:10px;border:1px solid var(--line);
+  background:var(--bg);color:var(--tx);font-size:1rem;-webkit-appearance:none;appearance:none}
+input:focus{outline:2px solid var(--acc);border-color:transparent}
+.field{margin-bottom:10px}
+.chk{display:flex;align-items:center;gap:8px;font-size:.9rem;color:var(--tx);margin:4px 0 12px}
+.chk input{width:20px;height:20px;accent-color:var(--acc)}
+.hint{font-size:.75rem;color:var(--mut);margin-top:4px}
+.warn{color:var(--acc)}
+.err{color:var(--bad);font-size:.85rem;margin-bottom:8px;min-height:1em}
+button{font:inherit;cursor:pointer;border:none;border-radius:10px;padding:12px 14px;font-weight:600}
+.btn{background:var(--acc);color:#111;width:100%;font-size:1rem}
+.btn2{background:var(--card2);color:var(--tx)}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi{background:var(--card2);border-radius:12px;padding:12px}
+.kpi .v{font-size:1.35rem;font-weight:700}
+.kpi .l{font-size:.75rem;color:var(--mut);margin-top:2px}
+.kpi.big{grid-column:1/-1;text-align:center}
+.kpi.big .v{font-size:2.2rem;color:var(--acc)}
+.item{border-top:1px solid var(--line);padding:12px 0;display:flex;gap:10px}
+.item:first-child{border-top:none}
+.item .main{flex:1;min-width:0}
+.item .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .s{font-size:.8rem;color:var(--mut);margin-top:2px}
+.item .r{text-align:right}
+.item .kpg{font-weight:700;font-size:1.1rem}
+.badge{display:inline-block;font-size:.7rem;padding:2px 6px;border-radius:6px;background:var(--card2);color:var(--mut);margin-left:4px}
+.up{color:var(--ok)}.down{color:var(--bad)}
+.acts{display:flex;gap:6px;margin-top:6px;justify-content:flex-end}
+.acts button{padding:6px 10px;font-size:.8rem;background:var(--card2);color:var(--tx)}
+.acts .del{color:var(--bad)}
+nav{position:fixed;left:0;right:0;bottom:0;background:#0b1222;border-top:1px solid var(--line);display:flex;
+  padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav button{flex:1;background:none;color:var(--mut);padding:10px 4px;font-size:.75rem;border-radius:0}
+nav button b{display:block;font-size:1.3rem;margin-bottom:2px}
+nav button.on{color:var(--acc)}
+.view{display:none}.view.on{display:block}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{padding:8px 4px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-weight:600;font-size:.75rem}
+.empty{color:var(--mut);text-align:center;padding:20px 0;font-size:.9rem}
+svg text{fill:var(--mut);font-size:10px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:10;padding:20px}
+.modal.on{display:flex}
+.modal .box{background:var(--card);border-radius:14px;padding:18px;max-width:360px;width:100%}
+.modal p{margin-bottom:14px}
+textarea{width:100%;height:140px;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:8px;font-size:.75rem}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ok);color:#052e12;padding:10px 16px;border-radius:10px;
+  font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>⛽ Control de <span>Combustible</span></h1>
+  <div class="ver"><div id="ver"></div><div class="sync" id="sync"></div></div>
+</header>
+
+<main>
+<!-- ===== REGISTRAR ===== -->
+<section class="view on" id="v-add">
+  <div class="card">
+    <h2 id="formTitle">Nuevo tanqueo</h2>
+    <div class="grid2">
+      <div class="field"><label>Fecha</label><input type="date" id="f-fecha"></div>
+      <div class="field"><label>Kilometraje (odómetro)</label><input type="number" inputmode="numeric" id="f-km" placeholder="Ej. 85230"></div>
+    </div>
+    <div class="hint" id="kmHint" style="margin:-4px 0 10px"></div>
+    <div class="field"><label>Estación de servicio</label><input type="text" id="f-est" list="estaciones" placeholder="Ej. Terpel Av. Pasoancho" autocomplete="off"><datalist id="estaciones"></datalist></div>
+    <div class="field"><label>Precio por galón (COP)</label><input type="number" inputmode="decimal" id="f-precio" placeholder="Ej. 16200"></div>
+    <div class="grid2">
+      <div class="field"><label>Volumen (galones)</label><input type="number" inputmode="decimal" step="0.001" id="f-gal" placeholder="Ej. 8.642"></div>
+      <div class="field"><label>Valor tanqueado (COP)</label><input type="number" inputmode="decimal" id="f-valor" placeholder="Ej. 140000"></div>
+    </div>
+    <div class="hint" id="calcHint" style="margin:-4px 0 8px"></div>
+    <label class="chk"><input type="checkbox" id="f-lleno" checked> Tanque lleno</label>
+    <div class="hint" style="margin:-8px 0 12px">Para un km/galón preciso, llena el tanque hasta el corte. Si es tanqueo parcial, desmarca: sus galones se suman al siguiente tanque lleno.</div>
+    <div class="err" id="err"></div>
+    <button class="btn" id="btnSave">Guardar tanqueo</button>
+    <button class="btn2" id="btnCancel" style="width:100%;margin-top:8px;display:none">Cancelar edición</button>
+  </div>
+  <div class="card" id="lastCard" style="display:none">
+    <h2>Último resultado</h2>
+    <div id="lastRes"></div>
+  </div>
+</section>
+
+<!-- ===== RESUMEN ===== -->
+<section class="view" id="v-sum">
+  <div class="card">
+    <h2>Rendimiento</h2>
+    <div class="kpis" id="kpis"></div>
+  </div>
+  <div class="card">
+    <h2>km/galón por tanqueo</h2>
+    <div id="chart"></div>
+  </div>
+  <div class="card">
+    <h2>Por estación</h2>
+    <div id="byStation"></div>
+  </div>
+</section>
+
+<!-- ===== HISTORIAL ===== -->
+<section class="view" id="v-hist">
+  <div class="card">
+    <h2>Historial</h2>
+    <div id="list"></div>
+  </div>
+</section>
+
+<!-- ===== DATOS ===== -->
+<section class="view" id="v-data">
+  <div class="card">
+    <h2>Nube (Google Sheets)</h2>
+    <div class="field"><label>Tu nombre (aparece en cada registro)</label><input type="text" id="c-nombre" placeholder="Ej. Ramiro"></div>
+    <div class="field"><label>URL de la aplicación web de Apps Script</label><input type="text" id="c-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    <div class="err" id="c-err"></div>
+    <button class="btn" id="btnConnect" style="margin-bottom:8px">Guardar y conectar</button>
+    <div class="row" style="margin-bottom:8px">
+      <button class="btn2" id="btnSyncNow">Sincronizar ahora</button>
+      <button class="btn2" id="btnShare">Copiar enlace para compartir</button>
+    </div>
+    <button class="btn2" id="btnDisconnect" style="width:100%">Desconectar de la nube</button>
+    <p class="hint" id="c-info" style="margin-top:10px"></p>
+  </div>
+  <div class="card">
+    <h2>Respaldo de datos</h2>
+    <p class="hint" style="margin-bottom:12px">Los datos se guardan en este teléfono. Haz respaldos periódicos para no perderlos si borras el navegador o cambias de equipo.</p>
+    <div class="row" style="margin-bottom:8px">
+      <button class="btn2" id="btnExport">Descargar respaldo</button>
+      <button class="btn2" id="btnCopy">Copiar respaldo</button>
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <button class="btn2" id="btnImport">Importar archivo</button>
+      <button class="btn2" id="btnPaste">Pegar respaldo</button>
+    </div>
+    <button class="btn2" id="btnCsv" style="width:100%">Descargar CSV (Excel)</button>
+    <input type="file" id="fileIn" accept=".json,application/json" style="display:none">
+  </div>
+  <div class="card">
+    <h2>Zona de peligro</h2>
+    <button class="btn2" id="btnWipe" style="width:100%;color:var(--bad)">Borrar todos los datos</button>
+  </div>
+</section>
+</main>
+
+<nav>
+  <button class="on" data-v="v-add"><b>➕</b>Registrar</button>
+  <button data-v="v-sum"><b>📊</b>Resumen</button>
+  <button data-v="v-hist"><b>📋</b>Historial</button>
+  <button data-v="v-data"><b>💾</b>Datos</button>
+</nav>
+
+<div class="modal" id="modal"><div class="box">
+  <p id="mTxt"></p>
+  <div id="mExtra"></div>
+  <div class="row"><button class="btn2" id="mNo">Cancelar</button><button class="btn" id="mYes">Aceptar</button></div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const VERSION = 'v1.1';
+const KEY = 'combustible_v1';
+const $ = id => document.getElementById(id);
+$('ver').textContent = VERSION;
+
+// ---------- Almacenamiento ----------
+let data = [];
+let memOnly = false;
+function load(){
+  try{ data = JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ data = []; memOnly = true; }
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){ memOnly = true; }
+}
+
+// ---------- Formato ----------
+const cop = n => isFinite(n) ? '$' + Math.round(n).toLocaleString('es-CO') : '—';
+const num = (n,d=1) => isFinite(n) ? n.toLocaleString('es-CO',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—';
+const kmf = n => Math.round(n).toLocaleString('es-CO');
+const fdate = s => { const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; };
+const today = () => { const t=new Date(); t.setMinutes(t.getMinutes()-t.getTimezoneOffset()); return t.toISOString().slice(0,10); };
+const pf = v => { const n = parseFloat(String(v).replace(',','.')); return isFinite(n) ? n : NaN; };
+
+// ---------- Cálculo de rendimiento ----------
+// Método tanque lleno a tanque lleno: km recorridos desde el último lleno / galones cargados en ese intervalo.
+function compute(){
+  const s = [...data].sort((a,b)=>a.km-b.km || a.fecha.localeCompare(b.fecha));
+  let lastFullKm = null, accGal = 0, accCost = 0;
+  for(const r of s){
+    r._kpg = null; r._dist = null; r._cpk = null;
+    if(lastFullKm === null){
+      if(r.lleno){ lastFullKm = r.km; accGal = 0; accCost = 0; }
+      continue;
+    }
+    accGal += r.gal; accCost += r.valor;
+    if(r.lleno){
+      const dist = r.km - lastFullKm;
+      if(dist > 0 && accGal > 0){
+        r._dist = dist; r._kpg = dist/accGal; r._cpk = accCost/dist; r._gal = accGal;
+      }
+      lastFullKm = r.km; accGal = 0; accCost = 0;
+    }
+  }
+  return s;
+}
+
+function stats(sorted){
+  const m = sorted.filter(r=>r._kpg);
+  const totKm = m.reduce((a,r)=>a+r._dist,0);
+  const totGalM = m.reduce((a,r)=>a+r._gal,0);
+  const totCostM = m.reduce((a,r)=>a+r._cpk*r._dist,0);
+  const totVal = sorted.reduce((a,r)=>a+r.valor,0);
+  const totGal = sorted.reduce((a,r)=>a+r.gal,0);
+  const kpgs = m.map(r=>r._kpg);
+  return {
+    n: sorted.length, nm: m.length,
+    avg: totGalM ? totKm/totGalM : NaN,
+    cpk: totKm ? totCostM/totKm : NaN,
+    best: kpgs.length ? Math.max(...kpgs) : NaN,
+    worst: kpgs.length ? Math.min(...kpgs) : NaN,
+    last: m.length ? m[m.length-1]._kpg : NaN,
+    totVal, totGal,
+    avgPrice: totGal ? totVal/totGal : NaN,
+    kmTot: sorted.length>1 ? sorted[sorted.length-1].km - sorted[0].km : 0
+  };
+}
+
+// ---------- Formulario ----------
+let editId = null;
+let lastEdited = null; // cuál campo de factura editó el usuario por última vez
+const fP = $('f-precio'), fG = $('f-gal'), fV = $('f-valor');
+[fP,fG,fV].forEach(el=>el.addEventListener('input',()=>{ el.dataset.touched='1'; checkCalc(); }));
+$('f-km').addEventListener('input', kmHint);
+
+function checkCalc(){
+  const p=pf(fP.value), g=pf(fG.value), v=pf(fV.value);
+  const h=$('calcHint'); h.className='hint'; h.textContent='';
+  if(isFinite(p)&&isFinite(g)&&isFinite(v)){
+    const exp=p*g, diff=Math.abs(exp-v)/v;
+    if(diff>0.015){ h.className='hint warn'; h.textContent=`⚠ Precio × galones = ${cop(exp)} (difiere ${num(diff*100)}% del valor). Revisa la factura.`; }
+    else h.textContent='✓ Datos de la factura consistentes';
+  }else{
+    const filled=[p,g,v].filter(isFinite).length;
+    if(filled===2) h.textContent='Se calculará el dato faltante automáticamente.';
+    if(filled===2){
+      if(!isFinite(v)) h.textContent=`Valor calculado: ${cop(p*g)}`;
+      else if(!isFinite(g)) h.textContent=`Galones calculados: ${num(v/p,3)}`;
+      else h.textContent=`Precio/galón calculado: ${cop(v/g)}`;
+    }
+  }
+}
+
+function kmHint(){
+  const km=pf($('f-km').value), h=$('kmHint'); h.className='hint'; h.textContent='';
+  const others=data.filter(r=>r.id!==editId).sort((a,b)=>b.km-a.km);
+  if(!others.length){ h.textContent='Primer registro: será la base para calcular el rendimiento.'; return; }
+  const prev=others[0];
+  if(isFinite(km)){
+    if(km<=prev.km && !editId){ h.className='hint warn'; h.textContent=`⚠ Menor o igual al último registro (${kmf(prev.km)} km)`; }
+    else if(km>prev.km) h.textContent=`Recorridos desde el último tanqueo: ${kmf(km-prev.km)} km`;
+  }else h.textContent=`Último kilometraje: ${kmf(prev.km)} km`;
+}
+
+function resetForm(){
+  editId=null;
+  $('f-fecha').value=today(); $('f-km').value=''; $('f-est').value='';
+  fG.value=''; fV.value='';
+  // sugerir último precio y estación
+  const last=[...data].sort((a,b)=>b.km-a.km)[0];
+  fP.value = last ? last.precio : '';
+  $('f-lleno').checked=true;
+  $('formTitle').textContent='Nuevo tanqueo'; $('btnSave').textContent='Guardar tanqueo';
+  $('btnCancel').style.display='none'; $('err').textContent='';
+  checkCalc(); kmHint();
+}
+
+$('btnSave').onclick=()=>{
+  const err=$('err'); err.textContent='';
+  const fecha=$('f-fecha').value, km=pf($('f-km').value), est=$('f-est').value.trim();
+  let p=pf(fP.value), g=pf(fG.value), v=pf(fV.value);
+  if(!fecha) return err.textContent='Ingresa la fecha.';
+  if(!isFinite(km)||km<0) return err.textContent='Ingresa el kilometraje del odómetro.';
+  if(!est) return err.textContent='Ingresa el nombre de la estación.';
+  const filled=[p,g,v].filter(x=>isFinite(x)&&x>0).length;
+  if(filled<2) return err.textContent='Ingresa al menos dos de: precio/galón, galones y valor.';
+  if(!(isFinite(v)&&v>0)) v=p*g;
+  else if(!(isFinite(g)&&g>0)) g=v/p;
+  else if(!(isFinite(p)&&p>0)) p=v/g;
+  const dup=data.find(r=>r.id!==editId && r.km===km);
+  if(dup) return err.textContent=`Ya existe un tanqueo con ${kmf(km)} km.`;
+
+  const rec={id: editId || Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    fecha, km, est, precio:Math.round(p*100)/100, gal:Math.round(g*1000)/1000, valor:Math.round(v), lleno:$('f-lleno').checked,
+    por: editId ? ((data.find(r=>r.id===editId)||{}).por || cfg.nombre) : cfg.nombre};
+  if(editId){ data=data.map(r=>r.id===editId?rec:r); }
+  else data.push(rec);
+  save();
+  enqueue({type:'upsert',rec});
+  const wasEdit=!!editId;
+  resetForm(); renderAll();
+  showLast(rec.id);
+  toast(wasEdit?'Tanqueo actualizado':'Tanqueo guardado');
+  if(wasEdit) go('v-hist');
+};
+$('btnCancel').onclick=()=>{ resetForm(); go('v-hist'); };
+
+let lastShownId=null;
+function showLast(id){
+  lastShownId=id;
+  const s=compute(), r=s.find(x=>x.id===id), st=stats(s);
+  const c=$('lastCard'), el=$('lastRes');
+  if(!r){ c.style.display='none'; return; }
+  c.style.display='block';
+  if(r._kpg){
+    const cmp = isFinite(st.avg) && st.nm>1 ? (r._kpg>=st.avg?`<span class="up">▲ sobre el promedio (${num(st.avg)})</span>`:`<span class="down">▼ bajo el promedio (${num(st.avg)})</span>`) : '';
+    el.innerHTML=`<div class="kpis">
+      <div class="kpi big"><div class="v">${num(r._kpg)}</div><div class="l">km/galón &nbsp; ${cmp}</div></div>
+      <div class="kpi"><div class="v">${kmf(r._dist)}</div><div class="l">km recorridos</div></div>
+      <div class="kpi"><div class="v">${cop(r._cpk)}</div><div class="l">costo por km</div></div></div>`;
+  }else if(!r.lleno){
+    el.innerHTML=`<p class="hint">Tanqueo parcial registrado. Sus ${num(r.gal,3)} gal se sumarán al cálculo del próximo tanque lleno.</p>`;
+  }else{
+    el.innerHTML=`<p class="hint">Registro base guardado. El rendimiento km/galón aparecerá desde el próximo tanque lleno.</p>`;
+  }
+}
+
+// ---------- Render ----------
+function renderAll(){ renderSum(); renderList(); renderStations(); }
+
+function renderStations(){
+  const names=[...new Set(data.map(r=>r.est))].sort();
+  $('estaciones').innerHTML=names.map(n=>`<option value="${esc(n)}">`).join('');
+}
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function renderSum(){
+  const s=compute(), st=stats(s);
+  if(!s.length){ $('kpis').innerHTML='<div class="empty" style="grid-column:1/-1">Aún no hay tanqueos registrados.</div>'; $('chart').innerHTML=''; $('byStation').innerHTML=''; return; }
+  $('kpis').innerHTML=`
+    <div class="kpi big"><div class="v">${num(st.avg)}</div><div class="l">km/galón promedio${st.nm?` (${st.nm} ${st.nm>1?'mediciones':'medición'})`:''}</div></div>
+    <div class="kpi"><div class="v">${num(st.last)}</div><div class="l">Último km/gal</div></div>
+    <div class="kpi"><div class="v">${cop(st.cpk)}</div><div class="l">Costo por km</div></div>
+    <div class="kpi"><div class="v up">${num(st.best)}</div><div class="l">Mejor km/gal</div></div>
+    <div class="kpi"><div class="v down">${num(st.worst)}</div><div class="l">Peor km/gal</div></div>
+    <div class="kpi"><div class="v">${cop(st.totVal)}</div><div class="l">Total gastado (${st.n} tanqueos)</div></div>
+    <div class="kpi"><div class="v">${num(st.totGal,1)}</div><div class="l">Galones totales</div></div>
+    <div class="kpi"><div class="v">${kmf(st.kmTot)}</div><div class="l">km registrados</div></div>
+    <div class="kpi"><div class="v">${cop(st.avgPrice)}</div><div class="l">Precio prom./galón</div></div>`;
+  renderChart(s.filter(r=>r._kpg), st.avg);
+  // por estación
+  const g={};
+  s.forEach(r=>{ const k=r.est; g[k]=g[k]||{n:0,val:0,gal:0,kd:0,kg:0}; const o=g[k]; o.n++; o.val+=r.valor; o.gal+=r.gal; if(r._kpg){o.kd+=r._dist;o.kg+=r._gal;} });
+  const rows=Object.entries(g).sort((a,b)=>b[1].n-a[1].n);
+  $('byStation').innerHTML=`<table><tr><th>Estación</th><th>Tanq.</th><th>$/gal</th><th>km/gal</th></tr>${
+    rows.map(([k,o])=>`<tr><td>${esc(k)}</td><td>${o.n}</td><td>${cop(o.val/o.gal)}</td><td>${o.kg?num(o.kd/o.kg):'—'}</td></tr>`).join('')}</table>
+    <p class="hint" style="margin-top:8px">km/gal por estación se asigna al tanqueo que cierra cada medición.</p>`;
+}
+
+function renderChart(pts, avg){
+  const el=$('chart');
+  if(pts.length<2){ el.innerHTML='<div class="empty">Se necesitan al menos 2 mediciones para graficar.</div>'; return; }
+  const p=pts.slice(-20), W=320,H=160,L=30,R=8,T=10,B=24;
+  const ys=p.map(r=>r._kpg), mn=Math.floor(Math.min(...ys,avg)*0.95), mx=Math.ceil(Math.max(...ys,avg)*1.05);
+  const x=i=>L+(W-L-R)*(p.length===1?0.5:i/(p.length-1)), y=v=>T+(H-T-B)*(1-(v-mn)/(mx-mn||1));
+  const path=p.map((r,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(r._kpg).toFixed(1)}`).join('');
+  const ticks=[mn,(mn+mx)/2,mx];
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%">
+    ${ticks.map(t=>`<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="#334155" stroke-width=".5"/><text x="${L-4}" y="${y(t)+3}" text-anchor="end">${num(t,0)}</text>`).join('')}
+    <line x1="${L}" x2="${W-R}" y1="${y(avg)}" y2="${y(avg)}" stroke="#38bdf8" stroke-dasharray="4 3" stroke-width="1"/>
+    <path d="${path}" fill="none" stroke="#f59e0b" stroke-width="2"/>
+    ${p.map((r,i)=>`<circle cx="${x(i)}" cy="${y(r._kpg)}" r="3" fill="#f59e0b"/>`).join('')}
+    <text x="${L}" y="${H-6}">${fdate(p[0].fecha)}</text><text x="${W-R}" y="${H-6}" text-anchor="end">${fdate(p[p.length-1].fecha)}</text>
+  </svg><p class="hint"><span style="color:var(--acc)">●</span> km/gal &nbsp; <span style="color:var(--blue)">- - -</span> promedio ${num(avg)}</p>`;
+}
+
+function renderList(){
+  const s=compute(), st=stats(s), el=$('list');
+  if(!s.length){ el.innerHTML='<div class="empty">Sin registros todavía.</div>'; return; }
+  el.innerHTML=[...s].reverse().map(r=>{
+    const k = r._kpg ? `<div class="kpg ${isFinite(st.avg)&&st.nm>1?(r._kpg>=st.avg?'up':'down'):''}">${num(r._kpg)}</div><div class="s">km/gal</div>`
+      : `<div class="s">${r.lleno?'base':'parcial'}</div>`;
+    return `<div class="item"><div class="main">
+      <div class="t">${esc(r.est)}${r.lleno?'':'<span class="badge">parcial</span>'}</div>
+      <div class="s">${fdate(r.fecha)} · ${kmf(r.km)} km${r._dist?` · +${kmf(r._dist)} km`:''}${r.por?` · ${esc(r.por)}`:''}</div>
+      <div class="s">${num(r.gal,3)} gal × ${cop(r.precio)} = <b style="color:var(--tx)">${cop(r.valor)}</b></div>
+      ${r._cpk?`<div class="s">${cop(r._cpk)}/km</div>`:''}
+      </div><div class="r">${k}
+      <div class="acts"><button data-e="${r.id}">Editar</button><button class="del" data-d="${r.id}">✕</button></div></div></div>`;
+  }).join('');
+}
+$('list').addEventListener('click',e=>{
+  const id=e.target.dataset.e, did=e.target.dataset.d;
+  if(id){
+    const r=data.find(x=>x.id===id); if(!r) return;
+    editId=id;
+    $('f-fecha').value=r.fecha; $('f-km').value=r.km; $('f-est').value=r.est;
+    fP.value=r.precio; fG.value=r.gal; fV.value=r.valor; $('f-lleno').checked=r.lleno;
+    $('formTitle').textContent='Editar tanqueo'; $('btnSave').textContent='Guardar cambios';
+    $('btnCancel').style.display='block'; $('lastCard').style.display='none';
+    checkCalc(); kmHint(); go('v-add'); window.scrollTo(0,0);
+  }
+  if(did){
+    const r=data.find(x=>x.id===did);
+    confirmBox(`¿Eliminar el tanqueo de ${fdate(r.fecha)} (${kmf(r.km)} km)?`,()=>{
+      data=data.filter(x=>x.id!==did); save(); enqueue({type:'delete',id:did}); renderAll(); toast('Eliminado');
+    });
+  }
+});
+
+// ---------- Navegación ----------
+function go(v){
+  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on',s.id===v));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{ go(b.dataset.v); if(b.dataset.v!=='v-add') sync(); });
+
+// ---------- Modal / toast ----------
+function confirmBox(txt,yes,extra=''){
+  $('mTxt').textContent=txt; $('mExtra').innerHTML=extra; $('modal').classList.add('on');
+  $('mYes').onclick=()=>{ const ok=yes(); if(ok!==false) $('modal').classList.remove('on'); };
+  $('mNo').onclick=()=>$('modal').classList.remove('on');
+}
+let tt; function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('on'); clearTimeout(tt); tt=setTimeout(()=>e.classList.remove('on'),1800); }
+
+// ---------- Respaldo ----------
+function backupJson(){ return JSON.stringify({app:'combustible',version:VERSION,fecha:new Date().toISOString(),registros:data},null,1); }
+function download(name,content,type){
+  try{
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type})); a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){ toast('No se pudo descargar; usa Copiar'); }
+}
+$('btnExport').onclick=()=>download(`combustible_${today()}.json`,backupJson(),'application/json');
+$('btnCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(backupJson()); toast('Respaldo copiado'); }catch(e){ confirmBox('Copia este texto manualmente:',()=>{}, `<textarea readonly>${esc(backupJson())}</textarea>`); } };
+$('btnCsv').onclick=()=>{
+  const s=compute();
+  const rows=[['Fecha','Kilometraje','Estación','Precio/galón','Galones','Valor','Tanque lleno','Registrado por','km recorridos','km/galón','Costo/km']];
+  s.forEach(r=>rows.push([r.fecha,r.km,r.est,r.precio,r.gal,r.valor,r.lleno?'Sí':'No',r.por||'',r._dist??'',r._kpg?r._kpg.toFixed(2):'',r._cpk?Math.round(r._cpk):'']));
+  const csv='﻿'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+  download(`combustible_${today()}.csv`,csv,'text/csv');
+};
+function importText(txt){
+  try{
+    const o=JSON.parse(txt), arr=Array.isArray(o)?o:o.registros;
+    if(!Array.isArray(arr)) throw 0;
+    const clean=arr.filter(r=>r&&r.fecha&&isFinite(r.km)&&isFinite(r.gal)&&isFinite(r.valor)).map(r=>({
+      id:r.id||Date.now().toString(36)+Math.random().toString(36).slice(2,6),fecha:r.fecha,km:+r.km,est:r.est||'—',
+      precio:+r.precio||(+r.valor/+r.gal),gal:+r.gal,valor:+r.valor,lleno:r.lleno!==false,por:r.por||''}));
+    if(cfg.url){
+      confirmBox(`Se agregarán ${clean.length} registros a la nube (los que ya existan se actualizan). ¿Continuar?`,()=>{
+        const ids=new Set(clean.map(r=>r.id)); data=data.filter(r=>!ids.has(r.id)).concat(clean); save();
+        clean.forEach(rec=>queue.push({type:'upsert',rec})); saveQ(); sync();
+        resetForm(); renderAll(); toast('Datos importados');
+      });
+    }else{
+      confirmBox(`Se importarán ${clean.length} registros y reemplazarán los ${data.length} actuales. ¿Continuar?`,()=>{
+        data=clean; save(); resetForm(); renderAll(); toast('Datos importados');
+      });
+    }
+  }catch(e){ toast('Archivo de respaldo inválido'); }
+}
+$('btnImport').onclick=()=>$('fileIn').click();
+$('fileIn').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>importText(rd.result); rd.readAsText(f); e.target.value=''; };
+$('btnPaste').onclick=()=>confirmBox('Pega aquí el texto del respaldo:',()=>{ const t=$('pasteTa').value.trim(); if(!t) return false; setTimeout(()=>importText(t),50); },'<textarea id="pasteTa"></textarea>');
+$('btnWipe').onclick=()=>confirmBox(cfg.url
+  ? '¿Borrar TODOS los tanqueos? Estás conectado a la nube: se borrarán de la hoja de Google para todos los usuarios. Haz un respaldo antes.'
+  : '¿Borrar TODOS los tanqueos? Esta acción no se puede deshacer. Haz un respaldo antes.',
+  ()=>{ data=[]; save(); enqueue({type:'clear'}); resetForm(); renderAll(); $('lastCard').style.display='none'; toast('Datos borrados'); });
+
+// ---------- Sincronización con Google Sheets ----------
+const CFG_KEY='combustible_cfg', Q_KEY='combustible_cola';
+let cfg={url:'',nombre:''}, queue=[], syncing=false, lastSync=null, syncErr='';
+const validUrl = u => /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(u);
+function loadCfg(){
+  try{ cfg=Object.assign(cfg, JSON.parse(localStorage.getItem(CFG_KEY))||{}); }catch(e){}
+  try{ queue=JSON.parse(localStorage.getItem(Q_KEY))||[]; }catch(e){}
+  try{
+    const p=new URLSearchParams(location.search).get('s');
+    if(p && validUrl(p) && p!==cfg.url){ cfg.url=p; saveCfg(); if(data.length) data.forEach(rec=>queue.push({type:'upsert',rec})); saveQ(); }
+  }catch(e){}
+}
+function saveCfg(){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }catch(e){} }
+function saveQ(){ try{ localStorage.setItem(Q_KEY, JSON.stringify(queue)); }catch(e){} }
+function enqueue(op){ if(!cfg.url) return; queue.push(op); saveQ(); sync(); }
+function applyQueue(list){
+  let d=[...list];
+  for(const op of queue){
+    if(op.type==='upsert'){ d=d.filter(r=>r.id!==op.rec.id); d.push(op.rec); }
+    else if(op.type==='delete') d=d.filter(r=>r.id!==op.id);
+    else if(op.type==='clear') d=[];
+  }
+  return d;
+}
+async function sync(){
+  if(!cfg.url || syncing) return;
+  syncing=true; setStatus();
+  try{
+    let res;
+    if(queue.length){
+      const sent=queue.slice();
+      const r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({ops:sent})});
+      res=await r.json();
+      if(!res.ok) throw new Error(res.error||'Error del servidor');
+      queue=queue.slice(sent.length); saveQ();
+    }else{
+      const r=await fetch(cfg.url+'?t='+Date.now());
+      res=await r.json();
+      if(!res.ok) throw new Error(res.error||'Error del servidor');
+    }
+    data=applyQueue(res.registros||[]); save();
+    lastSync=new Date(); syncErr='';
+    renderAll(); kmHint();
+    if(lastShownId && $('lastCard').style.display!=='none') showLast(lastShownId);
+  }catch(e){ syncErr = (e && e.message) || 'Sin conexión'; }
+  syncing=false; setStatus();
+  if(queue.length && !syncErr) sync();
+}
+function setStatus(){
+  const el=$('sync'), info=$('c-info');
+  if(!cfg.url){ el.textContent='Solo en este equipo'; el.className='sync'; info.textContent='Sin conectar: los datos solo quedan en este teléfono.'; return; }
+  const pend=queue.length?` · ${queue.length} pendiente${queue.length>1?'s':''}`:'';
+  if(syncing){ el.textContent='⏳ Sincronizando…'; el.className='sync'; }
+  else if(syncErr){ el.textContent='⚠ Sin conexión'+pend; el.className='sync err'; }
+  else if(lastSync){ el.textContent='☁ '+lastSync.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})+pend; el.className='sync ok'; }
+  else { el.textContent='☁ Conectado'+pend; el.className='sync'; }
+  info.textContent = syncErr
+    ? `No se pudo sincronizar (${syncErr}). Lo que registres se guarda en el teléfono y se envía cuando haya conexión.`
+    : `Conectado a Google Sheets${lastSync?' · última sincronización '+lastSync.toLocaleString('es-CO'):''}.`;
+}
+function fillCfgForm(){ $('c-url').value=cfg.url; $('c-nombre').value=cfg.nombre; }
+$('sync').onclick=()=>{ if(cfg.url) sync(); else go('v-data'); };
+$('btnConnect').onclick=()=>{
+  const u=$('c-url').value.trim(), n=$('c-nombre').value.trim(); $('c-err').textContent='';
+  cfg.nombre=n;
+  if(u && !validUrl(u)){ $('c-err').textContent='La URL debe ser de la forma https://script.google.com/macros/s/…/exec'; saveCfg(); return; }
+  const isNew = u && u!==cfg.url;
+  cfg.url=u; saveCfg();
+  if(isNew && data.length){ data.forEach(rec=>queue.push({type:'upsert',rec:Object.assign({},rec,{por:rec.por||n})})); saveQ(); }
+  lastSync=null; syncErr=''; setStatus();
+  if(cfg.url){ toast('Conectando…'); sync(); } else toast('Nombre guardado');
+};
+$('btnSyncNow').onclick=()=>{ if(!cfg.url){ $('c-err').textContent='Primero pega la URL y toca "Guardar y conectar".'; return; } sync(); };
+$('btnShare').onclick=async()=>{
+  if(!cfg.url){ $('c-err').textContent='Primero conecta la nube.'; return; }
+  const link=location.origin+location.pathname+'?s='+encodeURIComponent(cfg.url);
+  try{ await navigator.clipboard.writeText(link); toast('Enlace copiado'); }
+  catch(e){ confirmBox('Copia este enlace y envíalo:',()=>{}, `<textarea readonly>${esc(link)}</textarea>`); }
+};
+$('btnDisconnect').onclick=()=>confirmBox('¿Desconectar de la nube? Los datos actuales quedan en este teléfono y en la hoja de Google, pero dejarán de sincronizarse.',()=>{
+  cfg.url=''; saveCfg(); queue=[]; saveQ(); lastSync=null; syncErr=''; fillCfgForm(); setStatus(); toast('Desconectado');
+});
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') sync(); });
+window.addEventListener('online',()=>sync());
+
+// ---------- Inicio ----------
+load(); loadCfg(); fillCfgForm(); resetForm(); renderAll(); setStatus(); sync();
+if(memOnly) toast('Almacenamiento no disponible: los datos no se guardarán');
+</script>
+</body>
+</html>
