@@ -1,7 +1,7 @@
 // Service worker de Control de Combustible: permite abrir la app sin internet.
 // La página se pide primero a la red (para recibir actualizaciones) y, si no hay conexión, sale de la copia guardada.
 // Las llamadas a Dropbox no pasan por aquí.
-const CACHE = 'combustible-v1.3';
+const CACHE = 'combustible-v1.4';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon.png'];
 
 self.addEventListener('install', e => {

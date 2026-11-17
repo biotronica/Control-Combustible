@@ -99,14 +99,14 @@ textarea{width:100%;height:140px;background:var(--bg);color:var(--tx);border:1px
     <h2 id="formTitle">Nuevo tanqueo</h2>
     <div class="grid2">
       <div class="field"><label>Fecha</label><input type="date" id="f-fecha"></div>
-      <div class="field"><label>Kilometraje (odómetro)</label><input type="number" inputmode="numeric" id="f-km" placeholder="Ej. 85230"></div>
+      <div class="field"><label>Kilometraje (odómetro)</label><input type="text" inputmode="numeric" id="f-km" placeholder="Ej. 85230" autocomplete="off"></div>
     </div>
     <div class="hint" id="kmHint" style="margin:-4px 0 10px"></div>
     <div class="field"><label>Estación de servicio</label><input type="text" id="f-est" list="estaciones" placeholder="Ej. Terpel Av. Pasoancho" autocomplete="off"><datalist id="estaciones"></datalist></div>
-    <div class="field"><label>Precio por galón (COP)</label><input type="number" inputmode="decimal" id="f-precio" placeholder="Ej. 16200"></div>
+    <div class="field"><label>Precio por galón (COP)</label><input type="text" inputmode="decimal" id="f-precio" placeholder="Ej. 16200" autocomplete="off"></div>
     <div class="grid2">
-      <div class="field"><label>Volumen (galones)</label><input type="number" inputmode="decimal" step="0.001" id="f-gal" placeholder="Ej. 8.642"></div>
-      <div class="field"><label>Valor tanqueado (COP)</label><input type="number" inputmode="decimal" id="f-valor" placeholder="Ej. 140000"></div>
+      <div class="field"><label>Volumen (galones)</label><input type="text" inputmode="decimal" id="f-gal" placeholder="Ej. 8,642" autocomplete="off"></div>
+      <div class="field"><label>Valor tanqueado (COP)</label><input type="text" inputmode="decimal" id="f-valor" placeholder="Ej. 140000" autocomplete="off"></div>
     </div>
     <div class="hint" id="calcHint" style="margin:-4px 0 8px"></div>
     <label class="chk"><input type="checkbox" id="f-lleno" checked> Tanque lleno</label>
@@ -200,7 +200,7 @@ textarea{width:100%;height:140px;background:var(--bg);color:var(--tx);border:1px
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = 'v1.3';
+const VERSION = 'v1.4';
 const KEY = 'combustible_v1';
 const $ = id => document.getElementById(id);
 $('ver').textContent = VERSION;
@@ -221,7 +221,27 @@ const num = (n,d=1) => isFinite(n) ? n.toLocaleString('es-CO',{minimumFractionDi
 const kmf = n => Math.round(n).toLocaleString('es-CO');
 const fdate = s => { const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; };
 const today = () => { const t=new Date(); t.setMinutes(t.getMinutes()-t.getTimezoneOffset()); return t.toISOString().slice(0,10); };
-const pf = v => { const n = parseFloat(String(v).replace(',','.')); return isFinite(n) ? n : NaN; };
+// Lectura de números al estilo colombiano: acepta coma o punto decimal.
+// 'int' = kilometraje (se ignoran separadores); 'money' = pesos (punto o coma + 3 dígitos = miles);
+// 'dec' = galones (un solo separador siempre es decimal: 4.947 y 4,947 = cuatro galones y fracción).
+function parseNum(v, kind){
+  let s=String(v==null?'':v).trim().replace(/[\s$]/g,'');
+  if(!s) return NaN;
+  if(kind==='int') s=s.replace(/[.,]/g,'');
+  else{
+    const ld=s.lastIndexOf('.'), lc=s.lastIndexOf(',');
+    if(ld>-1 && lc>-1){ const dec=ld>lc?'.':','; s=s.split(dec==='.'?',':'.').join('').replace(dec,'.'); }
+    else if(ld>-1 || lc>-1){
+      const sep=ld>-1?'.':',', parts=s.split(sep);
+      if(parts.length>2) s=parts.join('');
+      else if(kind==='money' && parts[1].length===3) s=parts.join('');
+      else s=parts.join('.');
+    }
+  }
+  if(!/^\d*\.?\d+$/.test(s)) return NaN;
+  return parseFloat(s);
+}
+const decTxt = n => String(n).replace('.',',');
 
 // ---------- Cálculo de rendimiento ----------
 // Método tanque lleno a tanque lleno: km recorridos desde el último lleno / galones cargados en ese intervalo.
@@ -275,7 +295,7 @@ const fP = $('f-precio'), fG = $('f-gal'), fV = $('f-valor');
 $('f-km').addEventListener('input', kmHint);
 
 function checkCalc(){
-  const p=pf(fP.value), g=pf(fG.value), v=pf(fV.value);
+  const p=parseNum(fP.value,'money'), g=parseNum(fG.value,'dec'), v=parseNum(fV.value,'money');
   const h=$('calcHint'); h.className='hint'; h.textContent='';
   if(isFinite(p)&&isFinite(g)&&isFinite(v)){
     const exp=p*g, diff=Math.abs(exp-v)/v;
@@ -293,7 +313,7 @@ function checkCalc(){
 }
 
 function kmHint(){
-  const km=pf($('f-km').value), h=$('kmHint'); h.className='hint'; h.textContent='';
+  const km=parseNum($('f-km').value,'int'), h=$('kmHint'); h.className='hint'; h.textContent='';
   const others=data.filter(r=>r.id!==editId).sort((a,b)=>b.km-a.km);
   if(!others.length){ h.textContent='Primer registro: será la base para calcular el rendimiento.'; return; }
   const prev=others[0];
@@ -318,8 +338,8 @@ function resetForm(){
 
 $('btnSave').onclick=()=>{
   const err=$('err'); err.textContent='';
-  const fecha=$('f-fecha').value, km=pf($('f-km').value), est=$('f-est').value.trim();
-  let p=pf(fP.value), g=pf(fG.value), v=pf(fV.value);
+  const fecha=$('f-fecha').value, km=parseNum($('f-km').value,'int'), est=$('f-est').value.trim();
+  let p=parseNum(fP.value,'money'), g=parseNum(fG.value,'dec'), v=parseNum(fV.value,'money');
   if(!fecha) return err.textContent='Ingresa la fecha.';
   if(!isFinite(km)||km<0) return err.textContent='Ingresa el kilometraje del odómetro.';
   if(!est) return err.textContent='Ingresa el nombre de la estación.';
@@ -328,6 +348,9 @@ $('btnSave').onclick=()=>{
   if(!(isFinite(v)&&v>0)) v=p*g;
   else if(!(isFinite(g)&&g>0)) g=v/p;
   else if(!(isFinite(p)&&p>0)) p=v/g;
+  if(g>100) return err.textContent=`¿${num(g,3)} galones? Revisa el volumen: usa coma para los decimales, ej. 8,642.`;
+  if(p<3000) return err.textContent=`El precio por galón quedó en ${cop(p)}. Revisa el precio y los galones (decimales con coma, ej. 8,642).`;
+  if(p>100000) return err.textContent=`El precio por galón quedó en ${cop(p)}. Revisa el precio y los galones.`;
   const dup=data.find(r=>r.id!==editId && r.km===km);
   if(dup) return err.textContent=`Ya existe un tanqueo con ${kmf(km)} km.`;
 
@@ -436,7 +459,7 @@ $('list').addEventListener('click',e=>{
     const r=data.find(x=>x.id===id); if(!r) return;
     editId=id;
     $('f-fecha').value=r.fecha; $('f-km').value=r.km; $('f-est').value=r.est;
-    fP.value=r.precio; fG.value=r.gal; fV.value=r.valor; $('f-lleno').checked=r.lleno;
+    fP.value=decTxt(r.precio); fG.value=decTxt(r.gal); fV.value=r.valor; $('f-lleno').checked=r.lleno;
     $('formTitle').textContent='Editar tanqueo'; $('btnSave').textContent='Guardar cambios';
     $('btnCancel').style.display='block'; $('lastCard').style.display='none';
     checkCalc(); kmHint(); go('v-add'); window.scrollTo(0,0);
