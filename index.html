@@ -9,6 +9,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Combustible">
 <title>Control de Combustible</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
 :root{
   --bg:#0f172a;--card:#1e293b;--card2:#273449;--line:#334155;
@@ -197,7 +200,7 @@ textarea{width:100%;height:140px;background:var(--bg);color:var(--tx);border:1px
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = 'v1.2';
+const VERSION = 'v1.3';
 const KEY = 'combustible_v1';
 const $ = id => document.getElementById(id);
 $('ver').textContent = VERSION;
@@ -688,6 +691,7 @@ load(); loadCfg(); showCfg(); resetForm(); renderAll();
 try{ if(cfg.rt && !new URLSearchParams(location.search).get('code') && !location.search.includes('d=')) history.replaceState(null,'',shareLink()); }catch(e){}
 handleOAuthReturn().then(()=>sync());
 if(memOnly) toast('Almacenamiento no disponible: los datos no se guardarán');
+if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 </script>
 </body>
 </html>
