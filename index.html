@@ -145,16 +145,20 @@ textarea{width:100%;height:140px;background:var(--bg);color:var(--tx);border:1px
 <!-- ===== DATOS ===== -->
 <section class="view" id="v-data">
   <div class="card">
-    <h2>Nube (Google Sheets)</h2>
+    <h2>Nube (Dropbox)</h2>
     <div class="field"><label>Tu nombre (aparece en cada registro)</label><input type="text" id="c-nombre" placeholder="Ej. Ramiro"></div>
-    <div class="field"><label>URL de la aplicación web de Apps Script</label><input type="text" id="c-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
-    <div class="err" id="c-err"></div>
-    <button class="btn" id="btnConnect" style="margin-bottom:8px">Guardar y conectar</button>
-    <div class="row" style="margin-bottom:8px">
-      <button class="btn2" id="btnSyncNow">Sincronizar ahora</button>
-      <button class="btn2" id="btnShare">Copiar enlace para compartir</button>
+    <div id="c-setup">
+      <div class="field"><label>App key de Dropbox</label><input type="text" id="c-key" placeholder="Ej. a1b2c3d4e5f6g7h" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="err" id="c-err"></div>
+      <button class="btn" id="btnConnect" style="margin-bottom:8px">Conectar con Dropbox</button>
     </div>
-    <button class="btn2" id="btnDisconnect" style="width:100%">Desconectar de la nube</button>
+    <div id="c-on">
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn2" id="btnSyncNow">Sincronizar ahora</button>
+        <button class="btn2" id="btnShare">Copiar enlace para compartir</button>
+      </div>
+      <button class="btn2" id="btnDisconnect" style="width:100%">Desconectar de la nube</button>
+    </div>
     <p class="hint" id="c-info" style="margin-top:10px"></p>
   </div>
   <div class="card">
@@ -193,7 +197,7 @@ textarea{width:100%;height:140px;background:var(--bg);color:var(--tx);border:1px
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = 'v1.1';
+const VERSION = 'v1.2';
 const KEY = 'combustible_v1';
 const $ = id => document.getElementById(id);
 $('ver').textContent = VERSION;
@@ -468,13 +472,13 @@ function download(name,content,type){
 }
 $('btnExport').onclick=()=>download(`combustible_${today()}.json`,backupJson(),'application/json');
 $('btnCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(backupJson()); toast('Respaldo copiado'); }catch(e){ confirmBox('Copia este texto manualmente:',()=>{}, `<textarea readonly>${esc(backupJson())}</textarea>`); } };
-$('btnCsv').onclick=()=>{
+function buildCsv(){
   const s=compute();
   const rows=[['Fecha','Kilometraje','Estación','Precio/galón','Galones','Valor','Tanque lleno','Registrado por','km recorridos','km/galón','Costo/km']];
   s.forEach(r=>rows.push([r.fecha,r.km,r.est,r.precio,r.gal,r.valor,r.lleno?'Sí':'No',r.por||'',r._dist??'',r._kpg?r._kpg.toFixed(2):'',r._cpk?Math.round(r._cpk):'']));
-  const csv='﻿'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
-  download(`combustible_${today()}.csv`,csv,'text/csv');
-};
+  return '﻿'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+}
+$('btnCsv').onclick=()=>download(`combustible_${today()}.csv`,buildCsv(),'text/csv');
 function importText(txt){
   try{
     const o=JSON.parse(txt), arr=Array.isArray(o)?o:o.registros;
@@ -482,7 +486,7 @@ function importText(txt){
     const clean=arr.filter(r=>r&&r.fecha&&isFinite(r.km)&&isFinite(r.gal)&&isFinite(r.valor)).map(r=>({
       id:r.id||Date.now().toString(36)+Math.random().toString(36).slice(2,6),fecha:r.fecha,km:+r.km,est:r.est||'—',
       precio:+r.precio||(+r.valor/+r.gal),gal:+r.gal,valor:+r.valor,lleno:r.lleno!==false,por:r.por||''}));
-    if(cfg.url){
+    if(cfg.rt){
       confirmBox(`Se agregarán ${clean.length} registros a la nube (los que ya existan se actualizan). ¿Continuar?`,()=>{
         const ids=new Set(clean.map(r=>r.id)); data=data.filter(r=>!ids.has(r.id)).concat(clean); save();
         clean.forEach(rec=>queue.push({type:'upsert',rec})); saveQ(); sync();
@@ -498,98 +502,191 @@ function importText(txt){
 $('btnImport').onclick=()=>$('fileIn').click();
 $('fileIn').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>importText(rd.result); rd.readAsText(f); e.target.value=''; };
 $('btnPaste').onclick=()=>confirmBox('Pega aquí el texto del respaldo:',()=>{ const t=$('pasteTa').value.trim(); if(!t) return false; setTimeout(()=>importText(t),50); },'<textarea id="pasteTa"></textarea>');
-$('btnWipe').onclick=()=>confirmBox(cfg.url
-  ? '¿Borrar TODOS los tanqueos? Estás conectado a la nube: se borrarán de la hoja de Google para todos los usuarios. Haz un respaldo antes.'
+$('btnWipe').onclick=()=>confirmBox(cfg.rt
+  ? '¿Borrar TODOS los tanqueos? Estás conectado a la nube: se borrarán de Dropbox para todos los usuarios. Haz un respaldo antes.'
   : '¿Borrar TODOS los tanqueos? Esta acción no se puede deshacer. Haz un respaldo antes.',
   ()=>{ data=[]; save(); enqueue({type:'clear'}); resetForm(); renderAll(); $('lastCard').style.display='none'; toast('Datos borrados'); });
 
-// ---------- Sincronización con Google Sheets ----------
-const CFG_KEY='combustible_cfg', Q_KEY='combustible_cola';
-let cfg={url:'',nombre:''}, queue=[], syncing=false, lastSync=null, syncErr='';
-const validUrl = u => /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(u);
+// ---------- Sincronización con Dropbox ----------
+const CFG_KEY='combustible_cfg', Q_KEY='combustible_cola', PKCE_KEY='combustible_pkce';
+const FILE='/tanqueos.json', CSVFILE='/tanqueos.csv';
+const BASE = location.origin + location.pathname;
+let cfg={key:'',rt:'',nombre:''}, queue=[], syncing=false, lastSync=null, syncErr='', tok={at:'',exp:0};
+const b64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const encLink = o => b64url(new TextEncoder().encode(JSON.stringify(o)));
+const decLink = t => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(t.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))));
+const shareLink = () => BASE + '?d=' + encLink({k:cfg.key, r:cfg.rt});
+
 function loadCfg(){
   try{ cfg=Object.assign(cfg, JSON.parse(localStorage.getItem(CFG_KEY))||{}); }catch(e){}
   try{ queue=JSON.parse(localStorage.getItem(Q_KEY))||[]; }catch(e){}
   try{
-    const p=new URLSearchParams(location.search).get('s');
-    if(p && validUrl(p) && p!==cfg.url){ cfg.url=p; saveCfg(); if(data.length) data.forEach(rec=>queue.push({type:'upsert',rec})); saveQ(); }
+    const d=new URLSearchParams(location.search).get('d');
+    if(d){
+      const o=decLink(d);
+      if(o && o.k && o.r && o.r!==cfg.rt){
+        const wasConnected=!!cfg.rt;
+        cfg.key=o.k; cfg.rt=o.r; tok={at:'',exp:0}; saveCfg();
+        if(!wasConnected && data.length){ data.forEach(rec=>queue.push({type:'upsert',rec})); saveQ(); }
+      }
+    }
   }catch(e){}
 }
 function saveCfg(){ try{ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }catch(e){} }
 function saveQ(){ try{ localStorage.setItem(Q_KEY, JSON.stringify(queue)); }catch(e){} }
-function enqueue(op){ if(!cfg.url) return; queue.push(op); saveQ(); sync(); }
-function applyQueue(list){
+function enqueue(op){ if(!cfg.rt) return; queue.push(op); saveQ(); sync(); }
+function applyOps(list, ops){
   let d=[...list];
-  for(const op of queue){
+  for(const op of ops){
     if(op.type==='upsert'){ d=d.filter(r=>r.id!==op.rec.id); d.push(op.rec); }
     else if(op.type==='delete') d=d.filter(r=>r.id!==op.id);
     else if(op.type==='clear') d=[];
   }
   return d;
 }
+
+// --- OAuth (PKCE, sin secreto) ---
+async function connectDropbox(){
+  const key=$('c-key').value.trim(); $('c-err').textContent='';
+  if(!/^[a-z0-9]{8,30}$/i.test(key)){ $('c-err').textContent='Pega el App key que aparece en la configuración de tu app de Dropbox.'; return; }
+  cfg.nombre=$('c-nombre').value.trim(); saveCfg();
+  const verifier=b64url(crypto.getRandomValues(new Uint8Array(48)));
+  const challenge=b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  const state=b64url(crypto.getRandomValues(new Uint8Array(12)));
+  try{ localStorage.setItem(PKCE_KEY, JSON.stringify({verifier,state,key})); }catch(e){}
+  location.href='https://www.dropbox.com/oauth2/authorize?'+new URLSearchParams({
+    client_id:key, response_type:'code', code_challenge:challenge, code_challenge_method:'S256',
+    redirect_uri:BASE, token_access_type:'offline', state});
+}
+async function handleOAuthReturn(){
+  const p=new URLSearchParams(location.search);
+  if(!p.get('code') && !p.get('error')) return;
+  let pk=null; try{ pk=JSON.parse(localStorage.getItem(PKCE_KEY)); }catch(e){}
+  history.replaceState(null,'',BASE);
+  go('v-data');
+  if(p.get('error')){ $('c-err').textContent='Conexión cancelada en Dropbox.'; return; }
+  if(!pk || pk.state!==p.get('state')){ $('c-err').textContent='No se pudo verificar la conexión. Toca "Conectar con Dropbox" otra vez.'; return; }
+  try{
+    const r=await fetch('https://api.dropboxapi.com/oauth2/token',{method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({code:p.get('code'), grant_type:'authorization_code', code_verifier:pk.verifier, client_id:pk.key, redirect_uri:BASE})});
+    const j=await r.json();
+    if(!r.ok || !j.refresh_token) throw new Error(j.error_description||j.error||'respuesta inválida');
+    cfg.key=pk.key; cfg.rt=j.refresh_token; saveCfg();
+    tok={at:j.access_token, exp:Date.now()+(j.expires_in||3600)*1000};
+    try{ localStorage.removeItem(PKCE_KEY); }catch(e){}
+    if(data.length){ data.forEach(rec=>queue.push({type:'upsert',rec:Object.assign({},rec,{por:rec.por||cfg.nombre})})); saveQ(); }
+    history.replaceState(null,'',shareLink());
+    showCfg(); toast('Dropbox conectado'); sync();
+  }catch(e){ $('c-err').textContent='Error al conectar con Dropbox: '+e.message; }
+}
+
+// --- API de Dropbox ---
+async function getToken(){
+  if(tok.at && Date.now()<tok.exp-60000) return tok.at;
+  const r=await fetch('https://api.dropboxapi.com/oauth2/token',{method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({grant_type:'refresh_token', refresh_token:cfg.rt, client_id:cfg.key})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){ const err=new Error(j.error==='invalid_grant'?'acceso a Dropbox revocado, vuelve a conectar':(j.error_description||'token '+r.status)); err.auth=true; throw err; }
+  tok={at:j.access_token, exp:Date.now()+(j.expires_in||3600)*1000};
+  return tok.at;
+}
+async function dbxDownload(at){
+  const r=await fetch('https://content.dropboxapi.com/2/files/download',{method:'POST',
+    headers:{'Authorization':'Bearer '+at,'Dropbox-API-Arg':JSON.stringify({path:FILE})}});
+  if(r.status===409){ const t=await r.text(); if(t.includes('not_found')) return {list:[],rev:null}; throw new Error('Dropbox: '+t.slice(0,80)); }
+  if(r.status===401){ tok={at:'',exp:0}; throw new Error('sesión expirada, reintenta'); }
+  if(!r.ok) throw new Error('Dropbox '+r.status);
+  let rev=null;
+  try{ rev=JSON.parse(r.headers.get('Dropbox-API-Result')).rev; }catch(e){}
+  const txt=await r.text();
+  let list=[]; try{ const j=JSON.parse(txt); list=Array.isArray(j)?j:(j.registros||[]); }catch(e){ throw new Error('archivo de Dropbox dañado'); }
+  if(!rev){
+    const m=await fetch('https://api.dropboxapi.com/2/files/get_metadata',{method:'POST',
+      headers:{'Authorization':'Bearer '+at,'Content-Type':'application/json'},body:JSON.stringify({path:FILE})});
+    if(m.ok) rev=(await m.json()).rev;
+  }
+  return {list,rev};
+}
+async function dbxUpload(at,path,content,mode){
+  const r=await fetch('https://content.dropboxapi.com/2/files/upload',{method:'POST',
+    headers:{'Authorization':'Bearer '+at,'Content-Type':'application/octet-stream',
+      'Dropbox-API-Arg':JSON.stringify({path,mode,autorename:false,mute:true})},
+    body:new Blob([content])});
+  if(r.status===409) return {conflict:true};
+  if(!r.ok) throw new Error('Dropbox '+r.status+' '+(await r.text()).slice(0,60));
+  return r.json();
+}
+
 async function sync(){
-  if(!cfg.url || syncing) return;
+  if(!cfg.rt || syncing) return;
   syncing=true; setStatus();
   try{
-    let res;
-    if(queue.length){
-      const sent=queue.slice();
-      const r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({ops:sent})});
-      res=await r.json();
-      if(!res.ok) throw new Error(res.error||'Error del servidor');
-      queue=queue.slice(sent.length); saveQ();
-    }else{
-      const r=await fetch(cfg.url+'?t='+Date.now());
-      res=await r.json();
-      if(!res.ok) throw new Error(res.error||'Error del servidor');
+    const at=await getToken();
+    let done=false;
+    for(let i=0;i<5 && !done;i++){
+      const {list,rev}=await dbxDownload(at);
+      if(!queue.length){ data=list; done=true; break; }
+      const ops=queue.slice();
+      const merged=applyOps(list, ops);
+      const body=JSON.stringify({app:'combustible', actualizado:new Date().toISOString(), registros:merged});
+      const up=await dbxUpload(at, FILE, body, rev?{'.tag':'update',update:rev}:{'.tag':'add'});
+      if(up.conflict) continue;           // alguien más guardó al mismo tiempo: se vuelve a leer y combinar
+      queue=queue.slice(ops.length); saveQ();
+      data=applyOps(merged, queue); done=true;
+      save(); // para que el CSV use los datos nuevos
+      dbxUpload(at, CSVFILE, buildCsv(), {'.tag':'overwrite'}).catch(()=>{});
     }
-    data=applyQueue(res.registros||[]); save();
+    if(!done) throw new Error('no se pudo guardar, reintenta');
+    data=applyOps(data, []); save();
     lastSync=new Date(); syncErr='';
     renderAll(); kmHint();
     if(lastShownId && $('lastCard').style.display!=='none') showLast(lastShownId);
-  }catch(e){ syncErr = (e && e.message) || 'Sin conexión'; }
+  }catch(e){ syncErr=(e && e.message) || 'Sin conexión'; if(/Failed to fetch|NetworkError|Load failed/i.test(syncErr)) syncErr='sin conexión'; }
   syncing=false; setStatus();
   if(queue.length && !syncErr) sync();
 }
 function setStatus(){
   const el=$('sync'), info=$('c-info');
-  if(!cfg.url){ el.textContent='Solo en este equipo'; el.className='sync'; info.textContent='Sin conectar: los datos solo quedan en este teléfono.'; return; }
+  if(!cfg.rt){ el.textContent='Solo en este equipo'; el.className='sync'; info.textContent='Sin conectar: los datos solo quedan en este teléfono.'; return; }
   const pend=queue.length?` · ${queue.length} pendiente${queue.length>1?'s':''}`:'';
   if(syncing){ el.textContent='⏳ Sincronizando…'; el.className='sync'; }
-  else if(syncErr){ el.textContent='⚠ Sin conexión'+pend; el.className='sync err'; }
+  else if(syncErr){ el.textContent='⚠ Sin sincronizar'+pend; el.className='sync err'; }
   else if(lastSync){ el.textContent='☁ '+lastSync.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})+pend; el.className='sync ok'; }
   else { el.textContent='☁ Conectado'+pend; el.className='sync'; }
   info.textContent = syncErr
-    ? `No se pudo sincronizar (${syncErr}). Lo que registres se guarda en el teléfono y se envía cuando haya conexión.`
-    : `Conectado a Google Sheets${lastSync?' · última sincronización '+lastSync.toLocaleString('es-CO'):''}.`;
+    ? `No se pudo sincronizar (${syncErr}). Lo que registres se guarda en el teléfono y se envía cuando se pueda.`
+    : `Conectado a Dropbox (carpeta Aplicaciones)${lastSync?' · última sincronización '+lastSync.toLocaleString('es-CO'):''}`;
 }
-function fillCfgForm(){ $('c-url').value=cfg.url; $('c-nombre').value=cfg.nombre; }
-$('sync').onclick=()=>{ if(cfg.url) sync(); else go('v-data'); };
-$('btnConnect').onclick=()=>{
-  const u=$('c-url').value.trim(), n=$('c-nombre').value.trim(); $('c-err').textContent='';
-  cfg.nombre=n;
-  if(u && !validUrl(u)){ $('c-err').textContent='La URL debe ser de la forma https://script.google.com/macros/s/…/exec'; saveCfg(); return; }
-  const isNew = u && u!==cfg.url;
-  cfg.url=u; saveCfg();
-  if(isNew && data.length){ data.forEach(rec=>queue.push({type:'upsert',rec:Object.assign({},rec,{por:rec.por||n})})); saveQ(); }
-  lastSync=null; syncErr=''; setStatus();
-  if(cfg.url){ toast('Conectando…'); sync(); } else toast('Nombre guardado');
-};
-$('btnSyncNow').onclick=()=>{ if(!cfg.url){ $('c-err').textContent='Primero pega la URL y toca "Guardar y conectar".'; return; } sync(); };
+function showCfg(){
+  $('c-nombre').value=cfg.nombre; $('c-key').value=cfg.key;
+  $('c-setup').style.display=cfg.rt?'none':'block';
+  $('c-on').style.display=cfg.rt?'block':'none';
+  setStatus();
+}
+$('c-nombre').addEventListener('change',()=>{ cfg.nombre=$('c-nombre').value.trim(); saveCfg(); toast('Nombre guardado'); });
+$('sync').onclick=()=>{ if(cfg.rt) sync(); else go('v-data'); };
+$('btnConnect').onclick=()=>connectDropbox().catch(e=>$('c-err').textContent='Error: '+e.message);
+$('btnSyncNow').onclick=()=>sync();
 $('btnShare').onclick=async()=>{
-  if(!cfg.url){ $('c-err').textContent='Primero conecta la nube.'; return; }
-  const link=location.origin+location.pathname+'?s='+encodeURIComponent(cfg.url);
+  const link=shareLink();
   try{ await navigator.clipboard.writeText(link); toast('Enlace copiado'); }
   catch(e){ confirmBox('Copia este enlace y envíalo:',()=>{}, `<textarea readonly>${esc(link)}</textarea>`); }
 };
-$('btnDisconnect').onclick=()=>confirmBox('¿Desconectar de la nube? Los datos actuales quedan en este teléfono y en la hoja de Google, pero dejarán de sincronizarse.',()=>{
-  cfg.url=''; saveCfg(); queue=[]; saveQ(); lastSync=null; syncErr=''; fillCfgForm(); setStatus(); toast('Desconectado');
+$('btnDisconnect').onclick=()=>confirmBox('¿Desconectar de Dropbox? Los datos quedan en este teléfono y en Dropbox, pero dejarán de sincronizarse.',()=>{
+  cfg.rt=''; tok={at:'',exp:0}; saveCfg(); queue=[]; saveQ(); lastSync=null; syncErr='';
+  try{ history.replaceState(null,'',BASE); }catch(e){}
+  showCfg(); toast('Desconectado');
 });
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') sync(); });
 window.addEventListener('online',()=>sync());
 
 // ---------- Inicio ----------
-load(); loadCfg(); fillCfgForm(); resetForm(); renderAll(); setStatus(); sync();
+load(); loadCfg(); showCfg(); resetForm(); renderAll();
+// si está conectado, la dirección lleva la conexión para que 'Agregar a pantalla de inicio' la conserve
+try{ if(cfg.rt && !new URLSearchParams(location.search).get('code') && !location.search.includes('d=')) history.replaceState(null,'',shareLink()); }catch(e){}
+handleOAuthReturn().then(()=>sync());
 if(memOnly) toast('Almacenamiento no disponible: los datos no se guardarán');
 </script>
 </body>
